@@ -1,9 +1,10 @@
-# PreSale-Contract
+# PreSale + Airdrop Contract
 A contract to perfrom an automatic Pre-Sale
 
 Dev Instruction:
+
   Input the rate, the wallet that will receive BNB payments, and the token address to sell.
-  Send your desired amount of tokens to the contract and ENJOY
+  Send your desired amount of tokens to the contract. To Start ICO just call StartICO and input desired values.
 
 How does it work?
  The user will send an amount of BNB to the contract address and he will receive automatically the tokens. The BNB will be forwarded 

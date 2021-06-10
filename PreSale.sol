@@ -638,7 +638,7 @@ contract PreSale is ReentrancyGuard, Context, Ownable {
             require(recipients[i] != address(0));
             uint256 value = amount[i].mul(10**18);
             Claimed[recipients[i]] = true;
-           _token.safeTransfer(recipients[i], value);
+           _token.transfer(recipients[i], value);
         }
         emit DropSent(recipients, amount);
         return true;
@@ -663,7 +663,7 @@ contract PreSale is ReentrancyGuard, Context, Ownable {
     }
 
     function _deliverTokens(address beneficiary, uint256 tokenAmount) internal {
-        _token.safeTransfer(beneficiary, tokenAmount);
+        _token.transfer(beneficiary, tokenAmount);
     }
 
  

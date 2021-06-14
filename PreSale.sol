@@ -176,102 +176,6 @@ library Address {
     }
 }
 
-// File: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v2.5.1/contracts/token/ERC20/SafeERC20.sol
-
-
-
-
-/**
- * @title SafeERC20
- * @dev Wrappers around ERC20 operations that throw on failure (when the token
- * contract returns false). Tokens that return no value (and instead revert or
- * throw on failure) are also supported, non-reverting calls are assumed to be
- * successful.
- * To use this library you can add a `using SafeERC20 for ERC20;` statement to your contract,
- * which allows you to call the safe operations as `token.safeTransfer(...)`, etc.
- */
-library SafeERC20 {
-    using SafeMath for uint256;
-    using Address for address;
-
-    function safeTransfer(IERC20 token, address to, uint256 value) internal {
-        callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
-    }
-
-    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {
-        callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
-    }
-
-    function safeApprove(IERC20 token, address spender, uint256 value) internal {
-        // safeApprove should only be called when setting an initial allowance,
-        // or when resetting it to zero. To increase and decrease it, use
-        // 'safeIncreaseAllowance' and 'safeDecreaseAllowance'
-        // solhint-disable-next-line max-line-length
-        require((value == 0) || (token.allowance(address(this), spender) == 0),
-            "SafeERC20: approve from non-zero to non-zero allowance"
-        );
-        callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, value));
-    }
-
-    function safeIncreaseAllowance(IERC20 token, address spender, uint256 value) internal {
-        uint256 newAllowance = token.allowance(address(this), spender).add(value);
-        callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
-    }
-
-    function safeDecreaseAllowance(IERC20 token, address spender, uint256 value) internal {
-        uint256 newAllowance = token.allowance(address(this), spender).sub(value, "SafeERC20: decreased allowance below zero");
-        callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
-    }
-
-    /**
-     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
-     * on the return value: the return value is optional (but if data is returned, it must not be false).
-     * @param token The token targeted by the call.
-     * @param data The call data (encoded using abi.encode or one of its variants).
-     */
-    function callOptionalReturn(IERC20 token, bytes memory data) private {
-        // We need to perform a low level call here, to bypass Solidity's return data size checking mechanism, since
-        // we're implementing it ourselves.
-
-        // A Solidity high level call has three parts:
-        //  1. The target address is checked to verify it contains contract code
-        //  2. The call itself is made, and success asserted
-        //  3. The return value is decoded, which in turn checks the size of the returned data.
-        // solhint-disable-next-line max-line-length
-        require(address(token).isContract(), "SafeERC20: call to non-contract");
-
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success, bytes memory returndata) = address(token).call(data);
-        require(success, "SafeERC20: low-level call failed");
-
-        if (returndata.length > 0) { // Return data is optional
-            // solhint-disable-next-line max-line-length
-            require(abi.decode(returndata, (bool)), "SafeERC20: ERC20 operation did not succeed");
-        }
-    }
-}
-
-// File: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v2.5.1/contracts/utils/ReentrancyGuard.sol
-
-/**
- * @dev Contract module that helps prevent reentrant calls to a function.
- *
- * Inheriting from `ReentrancyGuard` will make the {nonReentrant} modifier
- * available, which can be applied to functions to make sure there are no nested
- * (reentrant) calls to them.
- *
- * Note that because there is a single `nonReentrant` guard, functions marked as
- * `nonReentrant` may not call one another. This can be worked around by making
- * those functions `private`, and then adding `external` `nonReentrant` entry
- * points to them.
- *
- * TIP: If you would like to learn more about reentrancy and alternative ways
- * to protect against it, check out our blog post
- * https://blog.openzeppelin.com/reentrancy-after-istanbul/[Reentrancy After Istanbul].
- *
- * _Since v2.5.0:_ this module is now much more gas efficient, given net gas
- * metering changes introduced in the Istanbul hardfork.
- */
 contract ReentrancyGuard {
     bool private _notEntered;
 
@@ -549,67 +453,60 @@ interface IERC20 {
 
 
 
-contract PreSale is ReentrancyGuard, Context, Ownable {
+contract Presale is ReentrancyGuard, Context, Ownable {
     using SafeMath for uint256;
-    using SafeERC20 for IERC20;
 
     IERC20 private _token;
+    uint256 private _tokenDecimals;
     address payable private _wallet;
-    uint256 private _rate;
-    uint256 private _weiRaised;
+    uint256 public _rate;
+    uint256 public _weiRaised;
     uint256 public endICO;
-    bool public airdropLive;
     uint public minPurchase;
+    uint public maxPurchase;
+    uint public hardCap;
+    uint public softCap;
     uint public availableTokensICO;
-    
-    mapping (address => bool) Claimed; 
-    mapping (address => uint256) valDrop;
 
     event TokensPurchased(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
-    event DropSent(address[]  receiver, uint256[]  amount);
-    event AirdropClaimed(address receiver, uint256 amount);
-    event WhitelistSetted(address[] recipient, uint256[] amount);
 
-    constructor (uint256 rate, address payable wallet, IERC20 token) public {
+    constructor (uint256 rate, address payable wallet, IERC20 token, uint256 tokenDecimals) public {
         require(rate > 0, "Pre-Sale: rate is 0");
         require(wallet != address(0), "Pre-Sale: wallet is the zero address");
         require(address(token) != address(0), "Pre-Sale: token is the zero address");
-
+        
         _rate = rate;
         _wallet = wallet;
         _token = token;
+        _tokenDecimals = 18 - tokenDecimals;
     }
 
 
     function () external payable {
-        if(endICO > 0 && now < endICO && availableTokensICO > 0){
+        if(endICO > 0 && now < endICO){
             buyTokens(_msgSender());
         }
-        else if(airdropLive == true){
-            claimTokens();
+        else{
+            revert('Pre-Sale is closed');
         }
     }
     
+    
     //Start Pre-Sale
-    function startICO(uint endDate, uint _minPurchase) external onlyOwner icoNotActive() {
+    function startICO(uint endDate, uint _minPurchase, uint _maxPurchase) external onlyOwner icoNotActive() {
+        availableTokensICO = _token.balanceOf(address(this));
         require(endDate > now, 'duration should be > 0');
-        uint _availableTokens = _token.balanceOf(address(this));
-        require(_availableTokens > 0 && _availableTokens <= _token.totalSupply(), 'availableTokens should be > 0 and <= totalSupply');
+        require(availableTokensICO > 0 && availableTokensICO <= _token.totalSupply(), 'availableTokens should be > 0 and <= totalSupply');
         require(_minPurchase > 0, '_minPurchase should > 0');
         endICO = endDate; 
-        availableTokensICO = _availableTokens;
         minPurchase = _minPurchase;
+        maxPurchase = _maxPurchase;
     }
     
     function stopICO() external onlyOwner icoActive(){
         endICO = 0;
     }
     
-    //Start Airdrop
-    function startAirdrop() public onlyOwner{
-        require(airdropLive == false, 'Airdrop already started');
-        airdropLive = true;
-    }
     
     //Pre-Sale 
     function buyTokens(address beneficiary) public nonReentrant icoActive payable {
@@ -627,39 +524,8 @@ contract PreSale is ReentrancyGuard, Context, Ownable {
         require(beneficiary != address(0), "Crowdsale: beneficiary is the zero address");
         require(weiAmount != 0, "Crowdsale: weiAmount is 0");
         require(weiAmount >= minPurchase, 'have to send at least: minPurchase');
+        require(weiAmount <= maxPurchase, 'have to send max: maxPurchase');
         this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-    }
-    
-    //Airdrop v1
-    function dropTokens(address[] memory recipients, uint256[] memory amount) public onlyOwner returns (bool) {
-        require(recipients.length == amount.length);
-        for (uint i = 0; i < recipients.length; i++) {
-            require(Claimed[recipients[i]] == false, 'Airdrop already claimed!');
-            require(recipients[i] != address(0));
-            uint256 value = amount[i].mul(10**18);
-            Claimed[recipients[i]] = true;
-           _token.transfer(recipients[i], value);
-        }
-        emit DropSent(recipients, amount);
-        return true;
-    }
-    
-    function setWhitelist(address[] calldata recipients, uint256[] calldata amount) external onlyOwner{
-        for(uint i = 0; i< recipients.length; i++){
-            require(recipients[i] != address(0));
-            valDrop[recipients[i]] = amount[i];
-        }
-        emit WhitelistSetted(recipients, amount);
-    }
-    
-    //Airdrop v2
-    function claimTokens() public nonReentrant payable {
-        require(airdropLive == true, 'Airdrop not started yet');
-        require(Claimed[msg.sender] == false, 'Airdrop already claimed!');
-        Claimed[msg.sender] = true;
-        uint256 amount = valDrop[msg.sender].mul(10**18);
-        _token.transfer(msg.sender, amount);
-        emit AirdropClaimed(msg.sender, amount);
     }
 
     function _deliverTokens(address beneficiary, uint256 tokenAmount) internal {
@@ -673,7 +539,7 @@ contract PreSale is ReentrancyGuard, Context, Ownable {
 
 
     function _getTokenAmount(uint256 weiAmount) internal view returns (uint256) {
-        return weiAmount.mul(_rate);
+        return weiAmount.mul(_rate).div(10**_tokenDecimals);
     }
 
     function _forwardFunds() internal {
@@ -685,6 +551,7 @@ contract PreSale is ReentrancyGuard, Context, Ownable {
         _wallet.transfer(address(this).balance);    
     }
     
+    
     function token() public view returns (IERC20) {
         return _token;
     }
@@ -693,15 +560,49 @@ contract PreSale is ReentrancyGuard, Context, Ownable {
     function wallet() public view returns (address payable) {
         return _wallet;
     }
-
+    
 
     function rate() public view returns (uint256) {
         return _rate;
     }
-
+    
+    function setRate(uint256 newRate) public onlyOwner {
+        _rate = newRate;
+    }
+    
+    function setAvailableTokens(uint256 amount) public onlyOwner {
+        availableTokensICO = amount;
+    }
  
     function weiRaised() public view returns (uint256) {
         return _weiRaised;
+    }
+    
+    function setWalletReceiver(address payable newWallet) external onlyOwner(){
+        _wallet = newWallet;
+    }
+    
+    function setSoftCap(uint256 value) external onlyOwner{
+        softCap = value;
+    }
+    
+    function setHardCap(uint256 value) external onlyOwner{
+        hardCap = value;
+    }
+    
+    function setMaxPurchase(uint256 value) external onlyOwner{
+        maxPurchase = value;
+    }
+    
+     function setMinPurchase(uint256 value) external onlyOwner{
+        minPurchase = value;
+    }
+    
+    function takeTokens(IERC20 tokenAddress)  public onlyOwner{
+        IERC20 tokenBEP = tokenAddress;
+        uint256 tokenAmt = tokenBEP.balanceOf(address(this));
+        require(tokenAmt > 0, 'BEP-20 balance is 0');
+        tokenBEP.transfer(_wallet, tokenAmt);
     }
     
     modifier icoActive() {

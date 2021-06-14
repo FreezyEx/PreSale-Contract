@@ -1,4 +1,4 @@
-# PreSale + Airdrop Contract
+# PreSale Contract
 A contract to perfrom an automatic Pre-Sale
 
 Dev Instruction:

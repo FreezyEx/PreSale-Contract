@@ -159,6 +159,7 @@ contract Presale is ReentrancyGuard, Context, Ownable {
     uint public softCap;
     uint public availableTokensICO;
     bool public startRefund = false;
+    uint256 public refundStartDate;
 
     event TokensPurchased(address  purchaser, address  beneficiary, uint256 value, uint256 amount);
     event Refund(address recipient, uint256 amount);
@@ -179,6 +180,7 @@ contract Presale is ReentrancyGuard, Context, Ownable {
             buyTokens(_msgSender());
         }
         else{
+            endICO = 0;
             revert('Pre-Sale is closed');
         }
     }
@@ -186,9 +188,13 @@ contract Presale is ReentrancyGuard, Context, Ownable {
     
     //Start Pre-Sale
     function startICO(uint endDate, uint _minPurchase, uint _maxPurchase, uint _softCap, uint _hardCap) external onlyOwner icoNotActive() {
+        startRefund = false;
+        refundStartDate = 0;
         availableTokensICO = _token.balanceOf(address(this));
         require(endDate > block.timestamp, 'duration should be > 0');
-        require(availableTokensICO > 0 && availableTokensICO <= _token.totalSupply(), 'availableTokens should be > 0 and <= totalSupply');
+        require(softCap < hardCap, "Softcap must be lower than Hardcap");
+        require(minPurchase < maxPurchase, "minPurchase must be lower than maxPurchase");
+        require(availableTokensICO > 0 , 'availableTokens must be > 0');
         require(_minPurchase > 0, '_minPurchase should > 0');
         endICO = endDate; 
         minPurchase = _minPurchase;
@@ -205,6 +211,7 @@ contract Presale is ReentrancyGuard, Context, Ownable {
         }
         else{
             startRefund = true;
+            refundStartDate = block.timestamp;
         }
     }
     
@@ -216,7 +223,6 @@ contract Presale is ReentrancyGuard, Context, Ownable {
         uint256 tokens = _getTokenAmount(weiAmount);
         _weiRaised = _weiRaised.add(weiAmount);
         availableTokensICO = availableTokensICO - tokens;
-        _processPurchase(beneficiary, tokens);
         _contributions[beneficiary] = _contributions[beneficiary].add(weiAmount);
         emit TokensPurchased(_msgSender(), beneficiary, weiAmount, tokens);
     }
@@ -225,18 +231,16 @@ contract Presale is ReentrancyGuard, Context, Ownable {
         require(beneficiary != address(0), "Crowdsale: beneficiary is the zero address");
         require(weiAmount != 0, "Crowdsale: weiAmount is 0");
         require(weiAmount >= minPurchase, 'have to send at least: minPurchase');
-        require(weiAmount <= maxPurchase, 'have to send max: maxPurchase');
-        require((_weiRaised+weiAmount) < hardCap, 'Hard Cap reached');
+        require(_contributions[beneficiary].add(weiAmount)<= maxPurchase, 'can\'t buy more than: maxPurchase');
+        require((_weiRaised+weiAmount) <= hardCap, 'Hard Cap reached');
         this; 
     }
 
-    function _deliverTokens(address beneficiary, uint256 tokenAmount) internal {
-        _token.transfer(beneficiary, tokenAmount);
-    }
-
- 
-    function _processPurchase(address beneficiary, uint256 tokenAmount) internal {
-        _deliverTokens(beneficiary, tokenAmount);
+    function claimTokens() external icoNotActive{
+        require(startRefund == false);
+        uint256 tokensAmt = _getTokenAmount(_contributions[msg.sender]);
+        _contributions[msg.sender] = 0;
+        _token.transfer(msg.sender, tokensAmt);
     }
 
 
@@ -249,7 +253,7 @@ contract Presale is ReentrancyGuard, Context, Ownable {
     }
     
      function withdraw() external onlyOwner icoNotActive{
-         require(startRefund == false);
+         require(startRefund == false || (refundStartDate + 3 days) < block.timestamp);
          require(address(this).balance > 0, 'Contract has no money');
         _wallet.transfer(address(this).balance);    
     }

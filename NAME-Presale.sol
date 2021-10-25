@@ -192,8 +192,8 @@ contract Presale is ReentrancyGuard, Context, Ownable {
         refundStartDate = 0;
         availableTokensICO = _token.balanceOf(address(this));
         require(endDate > block.timestamp, 'duration should be > 0');
-        require(softCap < hardCap, "Softcap must be lower than Hardcap");
-        require(minPurchase < maxPurchase, "minPurchase must be lower than maxPurchase");
+        require(_softCap < _hardCap, "Softcap must be lower than Hardcap");
+        require(_minPurchase < _maxPurchase, "minPurchase must be lower than maxPurchase");
         require(availableTokensICO > 0 , 'availableTokens must be > 0');
         require(_minPurchase > 0, '_minPurchase should > 0');
         endICO = endDate; 

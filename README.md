@@ -1,3 +1,3 @@
 # PreSale Contract
-A contract to perfrom an automatic Pre-Sale
+A contract to perfrom a manual-claim Pre-Sale
 
